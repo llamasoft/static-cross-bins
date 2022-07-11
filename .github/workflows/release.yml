@@ -1,0 +1,77 @@
+name: Automated Releases
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request: {}
+
+jobs:
+  automated-releases:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-linux-musl
+          - arm-linux-musleabi
+          - i686-linux-musl
+          - mips-linux-musl
+          - mipsel-linux-musl
+          - x86_64-linux-musl
+
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.target }}
+      cancel-in-progress: true
+
+    env:
+      TARGET: "${{ matrix.target }}"
+      OUTPUT: "output/${{ matrix.target }}/bin"
+
+    steps:
+      - name: Install Prerequisites
+        run: |
+          sudo apt-get install -y \
+            gcc g++ \
+            make autoconf automake libtool patch \
+            flex bison \
+            wget \
+            tar gzip bzip2 xz-utils
+
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Build Toolchain
+        run: make -w -j2 TARGET="${TARGET}" musl
+
+      - name: Build Static Binaries
+        run: make -w -j2 TARGET="${TARGET}" all
+
+      - name: Binary Listing
+        run: cd "${OUTPUT}" && ls -al "./"*
+
+      - name: Binary Types
+        run: cd "${OUTPUT}" && file "./"*
+
+      - name: Binary Hashes
+        run: cd "${OUTPUT}" && sha1sum "./"* | tee "hashes.sha1"
+
+      - name: Package Results
+        run: tar --strip-components=3 -czvf "${TARGET}.tar.gz" "${OUTPUT}/"*
+
+      - name: Package Hash
+        run: sha1sum "${TARGET}.tar.gz"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: github.event_name == 'push'
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}
+          prerelease: ${{ github.ref_type != 'tag' }}
+          generate_release_notes: ${{ github.ref_type == 'tag' }}
+          files: "${{ matrix.target }}.tar.gz"
+          fail_on_unmatched_files: true
