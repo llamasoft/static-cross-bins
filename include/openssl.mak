@@ -1,7 +1,7 @@
 ifeq (openssl,$(OPENSSL))
 
 NAME := openssl
-OPENSSL_VERSION := 3.0.4
+OPENSSL_VERSION := 3.0.7
 OPENSSL_URL := https://github.com/openssl/openssl/archive/refs/tags/openssl-$(OPENSSL_VERSION).tar.gz
 OPENSSL_PROGRAMS := openssl
 OPENSSL_LIBRARIES := libssl.a libcrypto.a
